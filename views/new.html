@@ -1,0 +1,34 @@
+﻿{% include "inc/header" %}
+
+	<div id="thumbnails" mode="new"></div>
+
+	<div class="box" align=center>
+		<form class="pure-form" method="post" action="/rubik/done">
+		<input type="hidden" name="type" value="{{result.name}}">
+		<input type="hidden" name="back" value="{{result.back}}">
+		<input type="hidden" name="parent_name" value="{{result.parent_name}}">
+		<input type="hidden" name="parent_id" value={{result.parent_id}}>
+		<input type="hidden" name="page" value="new">
+		<table class="pure-table pure-table-bordered">
+		    <tbody>
+		    	<tr>
+		            <td>{{result.name}} name</td>
+		            <td><input type="text" size=30 placeholder="" name="name"></td>
+		        </tr>
+		  		<tr>
+		  			<td colspan="2" align="center">
+		  				<button type="submit" class="pure-button pure-button-primary">add new {{result.name}}</button>
+		  			</td>
+		  		</tr>
+		    </tbody>
+		</table>
+	</form>
+	</div>
+	
+	<br>
+
+	<div class="menu" align=center>
+		<a href="{{result.back}}"><button class="pure-button pure-button-small">back</button></a>
+	</div>
+
+{% include "inc/footer" %}

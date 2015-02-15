@@ -1,0 +1,43 @@
+﻿{% include "inc/header" %}
+
+	<div class="subtitle" align=center>
+		{% if result.subtitle %}{{result.subtitle}}<br><br>{% endif %}
+	</div>
+
+	<div class="menu" align=center>
+		{% if result.parent_name %}<a href="/rubik/{{result.parent_name}}/{{result.parent_id}}/new/{{result.name}}">{% elif not result.parent_name %}<a href="/rubik/new/{{result.name}}">{% endif %}
+		<button type="submit" class="pure-button pure-button-primary pure-button-small">add new {{result.name}}</button></a>
+	</div>
+
+	<br>
+	
+	<div id="thumbnails" mode="static"></div>
+	
+	<div class="box" align=center>
+		<table class="pure-table pure-table-horizontal">
+			{% if result.container %}
+			<thead>
+				<tr>
+					{% if result.has_step %}<th>No.</th>{% endif %}
+					<th>{{result.name}}s</th>
+					{% if result.has_layout %}<th>&nbsp;</th>{% endif %}
+					<th>&nbsp;</th>
+				</tr>
+			</thead>
+
+			<tbody>
+				{% for i in result.container %}
+				<tr>
+					{% if result.has_step %}<td>{{i.step_number + 1}}</td>{% endif %}
+					<td><a href="/rubik/{{result.name}}/{{i.id}}">{{i.name}}</a></td>
+					{% if result.has_layout %}<td colspan=1><a href="/rubik/{{result.name}}/{{i.id}}"><div id="thumbnail_{{loop.index}}" param="{{i.layout_color}}"></div>
+					<canvas style="background-color:white;" width="100" height="100"></canvas></a></td>{% endif %}
+					<td><a href="/rubik/{{result.name}}/{{i.id}}/edit"><button class="pure-button"><i class="fa fa-cog"/></button></a></td>
+				</tr>
+				{% endfor %}
+			</tbody>
+			{% endif %}
+		</table>
+	</div>
+
+{% include "inc/footer" %}

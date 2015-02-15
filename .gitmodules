@@ -1,0 +1,9 @@
+[submodule "libs/bottle"]
+	path = libs/bottle
+	url = https://github.com/bottlepy/bottle.git
+[submodule "libs/markupsafe"]
+	path = libs/markupsafe
+	url = https://github.com/mitsuhiko/markupsafe.git
+[submodule "libs/jinja2"]
+	path = libs/jinja2
+	url = https://github.com/mitsuhiko/jinja2.git

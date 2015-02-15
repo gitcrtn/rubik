@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width">
+	<title>rubik note</title>
+	<link rel="stylesheet" href="http://yui.yahooapis.com/pure/0.5.0/pure-min.css">
+	<link rel="stylesheet" href="http://netdna.bootstrapcdn.com/font-awesome/4.0.3/css/font-awesome.css">
+</head>
+<body>
+	<div class="header" align=center>
+		<script src="http://azisava.sakura.ne.jp/js/lib/base64encoder.js"></script>
+		<script src="http://rawgithub.com/mrdoob/three.js/master/build/three.min.js"></script>
+		<script src="http://rawgithub.com/mrdoob/three.js/master/examples/js/controls/TrackballControls.js"></script>
+		<script src="http://rawgithub.com/mrdoob/three.js/master/examples/js/libs/tween.min.js"></script>
+		<script src="http://rawgithub.com/mrdoob/three.js/master/examples/js/renderers/CSS3DRenderer.js"></script>
+		<!-- <script src="http://rawgithub.com/robotnic/waterbug/master/waterbug.js"></script> -->
+		<script>	
+		trackballs = {};		
+		materials = [[0xCCCCCC,0.75],[0xFFFFFF,1.0],[0x0000FF,1.0,null],[0xFF0000,1.0],[0xFF8C00,1.0],[0x228B22,1.0],[0xFFFF00,1.0]];
+		mousedownelem = null;
+				
+		var palette_icon_data = 'data:image/png;base64,'+
+		'iVBORw0KGgoAAAANSUhEUgAAAB4AAAB4AQMAAADfU9CmAAAABGdBTUEAALGPC/xhBQAAAAZQTFRF'+
+		'AAAA////pdmf3QAAAAlwSFlzAAAOwAAADsABataJCQAAALpJREFUKM+V0EEKwjAQBdAv3WQh5gJC'+
+		'8R6CR/AM3qPQ3qAX8DBdCO68gt25rbsIQ8f5wRapEesij8DwJzOBqsqLO2nJqTQuEzxZCPp9JRAv'+
+		'BULdF3hciRqByM7oc6tqLZY4k1tgZ4y44dZZPw3ZMMFMOuRHtPBrY0WWxBH8xo2JmLUusd9fEyQJ'+
+		'B2604W5cqyEVAX8Ntq8A9k3A1p6MxALJvjDjXfBM8KrNlLeYJGj8QKo6ZlOdPyYQPAERtFv4i2Il'+
+		'XwAAAABJRU5ErkJggg==';
+		
+		var palette_icon = (function(){var img = new Image(); img.src = palette_icon_data; return img;})();
+		
+		var decodeColors = function(param){
+			var b64 = base64Encoder;
+			var arr = b64.decode(param);
+			var ret = [];
+			var i = 0, j = 0, tmp = 0, offset = 0;
+			for(i=0; i < 21; i+=3){
+				tmp = 0;
+				tmp += arr[i] + (arr[i+1] << 8) + (arr[i+2] << 16);
+				for(j=0; j < 8; j++){
+					offset = j * 3;
+					ret.push((tmp & (7 << offset)) >> offset);
+				}
+			}
+			return ret;
+		}
+		
+		var encodeColors = function(param){
+			var b64 = base64Encoder;
+			var ret = "";
+			var arr = [];
+			var tmp, i, j;
+			for(i=0; i < 56; i += 8){
+				tmp = 0;
+				for(j=0; j < 8; j++){
+					tmp += (param[i+j] & 7) << (j*3)
+				}
+				arr.push(tmp & 255)
+				arr.push((tmp & (255 << 8)) >> 8)
+				arr.push((tmp & (255 << 16)) >> 16)
+			}
+			return b64.encode(arr);
+		}
+				
+		var createMaterials = function(x,y,z,param,baseMaterials){
+			var ret = [];
+			var cnt = 0;
+			var f = "";
+			var xyz = [0,0,0];
+			var materialArg;
+			if(Math.abs(x-1) == 1){ cnt += 1; f += "x"; xyz[0] = Math.floor(0.5 * (x - 1) + 0.5);}
+			if(Math.abs(y-1) == 1){ cnt += 1; f += "y"; xyz[1] = Math.floor(0.5 * (y - 1) + 0.5);}
+			if(Math.abs(z-1) == 1){ cnt += 1; f += "z"; xyz[2] = Math.floor(0.5 * (z - 1) + 0.5);}
+			if(cnt==1){  // center cube
+				var args;
+				if(f.indexOf("x")!=-1){ args = [xyz[0] ,0]; }
+				else if(f.indexOf("y")!=-1){ args = [xyz[1] ,2]; }
+				else{ args = [xyz[2] ,4]; }
+				var facenum = args[0] + args[1];
+				var gridnum = 4;
+				var idx = (1 - args[0]) + args[1];
+				var color = param[facenum * 9 + gridnum];
+				for(var i=0; i < 6; i++){
+					if(i==idx){ materialArg = [baseMaterials[color][0],baseMaterials[color][1],false,facenum,gridnum]; }
+					else{ materialArg = [baseMaterials[0][0],baseMaterials[0][1],true,-1,-1]; }
+					ret.push(materialArg);
+				}
+			}
+			else if(cnt==2){  // edge cube
+				var args;
+				if(f=="xy"){ args = [xyz[0],0,1,xyz[1],6, xyz[1],2,3,xyz[0],2]; }
+				else if(f=="yz"){ args = [xyz[1],2,1,xyz[2],6, xyz[2],4,1,xyz[1],6]; }								
+				else{ args = [xyz[0],0,3,xyz[2],2, xyz[2],4,3,xyz[0],2]; }
+				var facenums = [];
+				var gridnums = [];
+				var idxs = [];
+				var colors = [];
+				for(var i=0; i < 2; i++){
+					idxs.push(1-args[i*5+0] + args[i*5+1]);	
+					facenums.push(args[i*5+0] + args[i*5+1]);
+					gridnums.push(args[i*5+2] + args[i*5+3] * args[i*5+4]);
+					colors.push(param[facenums.slice(-1) * 9 + gridnums.slice(-1) * 1]);	
+				}			
+				var j = 0;
+				for(var i=0; i < 6; i++){
+					j = idxs.indexOf(i);
+					if(j!=-1){ materialArg = [baseMaterials[colors[j]][0],baseMaterials[colors[j]][1],false,facenums[j],gridnums[j]]; }
+					else{ materialArg = [baseMaterials[0][0],baseMaterials[0][1],true,-1,-1]; }
+					ret.push(materialArg);
+				}			
+			}
+			else if(cnt==3){  // corner cube
+				var facenums = [];
+				var gridnums = [];
+				var idxs = [];
+				var colors = [];
+				var args = [xyz[0],0,1-xyz[2],1-xyz[1],  xyz[1],2,xyz[0],xyz[2],  xyz[2],4,xyz[0],1-xyz[1]];
+				for(var i=0; i < 3; i++){
+					idxs.push(1 - args[i*4+0] + args[i*4+1]);
+					facenums.push(args[i*4+0] + args[i*4+1]);
+					gridnums.push(2 * args[i*4+2] + 6 * args[i*4+3]);
+					colors.push(param[ facenums.slice(-1) * 9 + gridnums.slice(-1) * 1 ]);					
+				}
+				var j = 0;
+				for(var i=0; i < 6; i++){
+					j = idxs.indexOf(i);
+					if(j!=-1){ materialArg = [baseMaterials[colors[j]][0],baseMaterials[colors[j]][1],false,facenums[j],gridnums[j]]; }
+					else{ materialArg = [baseMaterials[0][0],baseMaterials[0][1],true,-1,-1]; }
+					ret.push(materialArg);
+				}				
+			}
+			else{  // core cube		
+				for(var i=0; i < 6; i++){
+					ret.push([baseMaterials[0][0],baseMaterials[0][1],true,-1,-1]);
+				}
+			}
+			return ret;
+		}
+		
+		var createCSS3DMaterialElement = function(color,opacity,inside,facenum,gridnum){
+			var element = document.createElement( 'div' );
+			element.style.width = '100px';
+			element.style.height = '100px';
+			element.style.background = new THREE.Color( color ).getStyle();
+			element.style.borderWidth = '10px';
+			element.style.borderColor = new THREE.Color( 0x000000 ).getStyle();
+			element.style.borderStyle = 'solid';
+			element.style.opacity = opacity + '';
+			element.insidecubes = inside;
+			element.facenum = facenum;
+			element.gridnum = gridnum;
+			return element;
+		}
+		
+		var palette_icon_bg = function(context,icon_num,color){
+			context.globalAlpha = 1.0;
+			context.drawImage(palette_icon, 1, icon_num*30+1, 28, 28, 271, icon_num*30+211, 28, 28);
+			if(color!=null){
+				context.globalAlpha = 0.2;
+				context.fillStyle = color;
+				context.fillRect(271, icon_num*30+211, 28, 28);	
+			}			
+		}
+		
+		var trackball_tween_complete = function(elem){
+			if(elem.rotate_tween && elem.zoompan_tween){			
+				elem.trackball.reset();
+				palette_icon_bg(elem.palette.getContext('2d'),2,"#555555");
+			}
+		}
+		
+		var trackball_smooth_reset = function(elem,duration){
+			TWEEN.removeAll();
+			
+			elem.easing = {r:0.0, zp:0.0};
+			elem.prevEasing = {r:0.0, zp:0.0};
+			elem.rotate_tween = false;
+			elem.zoompan_tween = false;
+			
+			var endVec = (new THREE.Vector3()).subVectors(elem.trackball.position0, elem.trackball.target0);
+			var startVec = (new THREE.Vector3()).subVectors(elem.trackball.object.position, elem.trackball.target);
+			elem.rotate_axis = (new THREE.Vector3()).crossVectors( startVec, endVec ).normalize();
+			elem.rotate_angle = Math.acos( startVec.dot( endVec ) / startVec.length() / endVec.length() );
+			var rotate_quaternion = (new THREE.Quaternion()).setFromAxisAngle( elem.rotate_axis, elem.rotate_angle );
+			startVec.applyQuaternion( rotate_quaternion );
+			var startTarget = (elem.trackball.target.clone()).applyQuaternion( rotate_quaternion );
+			elem.zoomdistance = endVec.length() -  startVec.length();
+			endVec = elem.trackball.up0.clone();
+			startVec = elem.trackball.object.up.clone();
+			elem.up_axis = (new THREE.Vector3()).crossVectors( startVec, endVec ).normalize();
+			elem.up_angle = Math.acos( startVec.dot( endVec ) / startVec.length() / endVec.length() );
+				
+			if(elem.rotate_angle!=0.0 && elem.up_angle!=0.0){
+				new TWEEN.Tween(elem.easing)
+				.to({r:1.0}, duration)
+				.easing(TWEEN.Easing.Back.InOut)
+				.onUpdate(function(){			
+					var delta = elem.easing.r - elem.prevEasing.r;
+					if(elem.easing.r!=0){ elem.prevEasing.r = elem.easing.r; }
+					var rotate_quaternion = (new THREE.Quaternion()).setFromAxisAngle( elem.rotate_axis, elem.rotate_angle * delta );
+					var up_quaternion = (new THREE.Quaternion()).setFromAxisAngle( elem.up_axis, elem.up_angle * delta );
+					var eye = (new THREE.Vector3()).subVectors( elem.trackball.object.position, elem.trackball.target );
+					eye.applyQuaternion( rotate_quaternion );
+					elem.trackball.object.up.applyQuaternion( up_quaternion );					
+					elem.trackball.object.position.addVectors( elem.trackball.target, eye );
+					elem.trackball.object.lookAt( elem.trackball.target );	
+				})
+				.onComplete(function(){
+					elem.rotate_tween = true;
+					trackball_tween_complete(elem);
+				})
+				.start();
+			}
+			else{
+				elem.rotate_tween = true;
+			}
+			
+		    new TWEEN.Tween(elem.easing)
+			.to({zp:1.0}, duration)
+			.easing(TWEEN.Easing.Quartic.InOut)
+			.onUpdate(function(){
+				var delta = elem.easing.zp - elem.prevEasing.zp;
+				var panDelta = delta / (1.0 - elem.easing.zp)
+				if(elem.easing.zp!=0){ elem.prevEasing.zp = elem.easing.zp; }
+				var eye = (new THREE.Vector3()).subVectors( elem.trackball.object.position, elem.trackball.target );
+				eye.setLength( eye.length() + elem.zoomdistance * delta );
+				var targetDiff = (new THREE.Vector3()).subVectors( elem.trackball.target0, elem.trackball.target );
+				var pan = (targetDiff.clone()).multiplyScalar(panDelta);
+				elem.trackball.object.position.add( pan );
+				elem.trackball.target.add( pan );
+				elem.trackball.object.position.addVectors( elem.trackball.target, eye );
+				elem.trackball.object.lookAt( elem.trackball.target );	
+				if(!elem.trackball.enabled){
+					palette_icon_bg(elem.palette.getContext('2d'),0,"#555555");
+					palette_icon_bg(elem.palette.getContext('2d'),1,null);
+					elem.trackball.enabled = true;
+				}				
+			})
+			.onComplete(function(){
+				elem.zoompan_tween = true;
+				trackball_tween_complete(elem);
+			})
+			.start();			
+		}
+		
+		var init_palette = function(elem){
+			document.getElementById(elem.getAttribute("cubes")).palette = elem;
+			var canvas = elem;
+			canvas.selectcolor = 0;
+			canvas.width = 300;
+			canvas.height = 300;
+			var context = canvas.getContext('2d');
+			context.beginPath();
+			context.fillStyle = "#FFFFFF";
+			context.fillRect(0, 0, 300, 300);
+			context.fillStyle = "#000000";
+			context.fillRect(270, 0, 30, 300);
+			for(var i=0; i < 7; i++){
+				context.fillStyle = "#" + ("000000" + materials[i][0].toString(16)).slice(-6);
+				context.fillRect(271, i*30+1, 28, 28);
+			}
+			context.drawImage(palette_icon, 1, 1, 28, 28, 271, 211, 28, 28);
+			context.drawImage(palette_icon, 1, 31, 28, 28, 271, 241, 28, 28);
+			context.drawImage(palette_icon, 1, 61, 28, 28, 271, 271, 28, 28);
+			context.globalAlpha = 0.2;
+			context.fillStyle = "#555555";
+			context.fillRect(271, 211, 28, 28);	
+			context.fillRect(271, 271, 28, 28);	
+			context.globalAlpha = 0.5;
+			context.drawImage(palette_icon, 1, 91, 28, 28, 271, 1, 28, 28);		
+			context.fillStyle = "#" + ("000000" + materials[0][0].toString(16)).slice(-6);
+			context.fillRect(271, 1, 28, 28);							
+			canvas.onmousedown = (function(event) {
+				var context = event.target.getContext('2d');
+				var rect = event.target.getBoundingClientRect();				
+				var mx = event.clientX - rect.left;
+				var my = event.clientY - rect.top;	
+				if ((270 <= mx) && (mx <= 300)) {
+					if (210 <= my && (my <= 239)) {
+						palette_icon_bg(context,0,null);
+						palette_icon_bg(context,1,"#555555");
+						var cubes_id = event.target.getAttribute("cubes");
+						var cubes_elem = document.getElementById(cubes_id);
+						cubes_elem.trackball.enabled = false;
+					}
+					else if (240 <= my && (my <= 269)) {
+						palette_icon_bg(context,0,"#555555");
+						palette_icon_bg(context,1,null);
+						var cubes_id = event.target.getAttribute("cubes");
+						var cubes_elem = document.getElementById(cubes_id);
+						cubes_elem.trackball.enabled = true;
+					}
+					else if (270 <= my && (my <= 300)) {
+						palette_icon_bg(context,2,null);
+						var cubes_elem = document.getElementById(event.target.getAttribute("cubes"));
+						trackball_smooth_reset(cubes_elem,1000);
+					}
+					else{
+						var j = Math.floor(my / 30);
+						event.target.selectcolor = j;
+						context.globalAlpha = 1.0;
+						for(var i=0; i < 7; i++){
+							context.fillStyle = "#" + ("000000" + materials[i][0].toString(16)).slice(-6);
+							context.fillRect(271, i*30+1, 28, 28);
+						}
+						context.globalAlpha = 0.5;
+						context.drawImage(palette_icon, 1, 91, 28, 28, 271, j*30+1, 28, 28);
+						context.fillStyle = "#" + ("000000" + materials[j][0].toString(16)).slice(-6);
+						context.fillRect(271, j*30+1, 28, 28);						
+					}
+				}
+			});
+		}
+				
+		var CSS3DBoxGeometry = function(materialArgs){
+			var cube = new THREE.Object3D();			
+			var r = [[0,Math.PI/2,0],[Math.PI/2,0,0],[0,0,0]]; 
+			var p = [[60,0,0],[-60,0,0],[0,60,0],[0,-60,0],[0,0,60],[0,0,-60]];			
+			for(var i=0; i < 6; i++){
+				var face = new THREE.CSS3DObject(createCSS3DMaterialElement(materialArgs[i][0],materialArgs[i][1],materialArgs[i][2],materialArgs[i][3],materialArgs[i][4]));
+				face.rotation.set(face.rotation.x + r[Math.floor(i/2)][0], face.rotation.y + r[Math.floor(i/2)][1], face.rotation.z + r[Math.floor(i/2)][2]);
+				face.position.set(face.position.x + p[i][0], face.position.y + p[i][1], face.position.z + p[i][2]);
+				cube.add( face );
+			}			
+			return cube;
+		}
+
+		function createRenderer(param,edit,elem) {
+		 
+			var scene = new THREE.Scene();
+		 
+			var width  = 100;
+			var height = 100;
+			if(edit){
+				width = 270;
+				height = 300;
+			}
+			var fov    = 15;
+			var aspect = width / height;
+			var near   = 1;
+			var far    = 1000;
+		 
+			var camera = new THREE.PerspectiveCamera( fov, aspect, near, far );
+			camera.position.set( 0, 1800, 3600 );
+			camera.lookAt(scene.position);
+						
+			if(!edit){
+				var eye = (new THREE.Vector3()).subVectors(camera.position, scene.position);
+				eye.setLength(eye.length() * 0.6);
+				camera.position.addVectors( scene.position, eye );
+			}
+					 
+			var group = new THREE.Object3D();
+			
+			elem.cubeObjs = [];
+			for(var i=0; i < 3; i++){
+				for(var j=0; j < 3; j++){
+					for(var k=0; k < 3; k++){
+						var mesh = CSS3DBoxGeometry(createMaterials(i,j,k,param,materials));	
+						mesh.position.x += i * 120 - 120 + (i-1) * 0.2
+						mesh.position.y += j * 120 - 120 + (j-1) * 0.2
+						mesh.position.z += k * 120 - 120 + (k-1) * 0.2
+						group.add( mesh );
+						Array.prototype.push.apply(elem.cubeObjs, mesh.children);
+					}
+				}
+			}
+						
+			scene.add(group);
+			group.rotation.set(0, mesh.rotation.y - Math.PI/4, 0);
+											 
+			var renderer = new THREE.CSS3DRenderer();
+			renderer.setSize( width, height );
+			renderer.domElement.style.position = 'absolute'; 
+			elem.appendChild(renderer.domElement); 
+		 
+			if(edit){
+				var trackball = new THREE.TrackballControls(camera, renderer.domElement);
+				trackball.noRotate = false;
+				trackball.rotateSpeed = 2.0;
+				trackball.noZoom = false;
+				trackball.zoomSpeed = 3.0;
+				trackball.noPan = false;
+				trackball.panSpeed = 0.3;
+				trackball.staticMoving = true;
+				trackball.dynamicDampingFactor = 0.3;
+				trackball.addEventListener('change', render); 
+				trackballs[elem.id] = trackball;				
+				elem.renderer = renderer;
+				elem.scene = scene;
+				elem.camera = camera;
+				elem.trackball = trackball;
+				elem.prevselectface = null;
+				elem.colors = param;
+				
+				elem.selectmousemove = (function(event) {
+					event.preventDefault();
+					event.stopPropagation();
+					
+					if(event.target.cubes !== undefined){	
+						if(event.target.cubes.prevselectface != event.target && !event.target.insidecubes){	
+							event.target.style.background = new THREE.Color( materials[event.target.cubes.palette.selectcolor][0] ).getStyle();
+							event.target.style.opacity = '' + materials[event.target.cubes.palette.selectcolor][1];
+							event.target.cubes.colors[9*event.target.facenum+event.target.gridnum] = event.target.cubes.palette.selectcolor;
+						}
+						elem.prevselectface = event.target;
+					}
+					else{
+						if(mousedownelem!=null){
+							document.removeEventListener( 'mousemove', mousedownelem.selectmousemove );
+							document.removeEventListener( 'mouseup', mousedownelem.selectmouseup );
+						}					
+					}
+				});
+				
+				elem.onmousedown = (function(event) {	
+					event.preventDefault();
+					event.stopPropagation();
+				
+					if(event.target.cubes !== undefined){			
+						event.target.cubes.prevselectface = event.target;
+						if(!event.target.insidecubes){
+							event.target.style.background = new THREE.Color( materials[event.target.cubes.palette.selectcolor][0] ).getStyle();
+							event.target.style.opacity = '' + materials[event.target.cubes.palette.selectcolor][1];
+							event.target.cubes.colors[9*event.target.facenum+event.target.gridnum] = event.target.cubes.palette.selectcolor;
+						}
+						document.addEventListener( 'mousemove', event.target.cubes.selectmousemove, false );
+						document.addEventListener( 'mouseup', event.target.cubes.selectmouseup, false );
+						mousedownelem = event.target.cubes;
+					}
+				});
+				
+				elem.ontouchstart = (function(event){
+					if(event.touches.length){
+						if(event.target.cubes !== undefined){	
+							if(event.target.cubes.trackball.enabled){return;}
+							event.target.cubes.prevselectface = event.target;
+							if(!event.target.insidecubes){
+								event.target.style.background = new THREE.Color( materials[event.target.cubes.palette.selectcolor][0] ).getStyle();
+								event.target.style.opacity = '' + materials[event.target.cubes.palette.selectcolor][1];
+								event.target.cubes.colors[9*event.target.facenum+event.target.gridnum] = event.target.cubes.palette.selectcolor;
+							}
+							mousedownelem = event.target.cubes;
+						}					
+					}					
+				});
+				
+				elem.ontouchmove = (function(event){
+					event.preventDefault();
+					event.stopPropagation();
+					/*
+					if(event.target.cubes !== undefined){	
+						if(event.target.cubes.trackball.enabled){return;}
+						if(event.target.cubes.prevselectface != event.target && !event.target.insidecubes){	
+							event.target.style.background = new THREE.Color( materials[event.target.cubes.palette.selectcolor][0] ).getStyle();
+							event.target.style.opacity = '' + materials[event.target.cubes.palette.selectcolor][1];
+							//event.target.cubes.colors[9*event.target.facenum+event.target.gridnum] = event.target.cubes.palette.selectcolor;
+						}
+						elem.prevselectface = event.target;
+					}
+					*/
+				});
+				
+				elem.selectmouseup = (function(event) {
+					event.preventDefault();
+					event.stopPropagation();
+					
+					if(mousedownelem!=null){
+						document.removeEventListener( 'mousemove', mousedownelem.selectmousemove );
+						document.removeEventListener( 'mouseup', mousedownelem.selectmouseup );
+					}
+				});
+			}
+			
+			for(var i=0; i < elem.cubeObjs.length; i++){
+				elem.cubeObjs[i].element.cubes = elem;
+			}
+						
+			renderer.render(scene, camera);
+		}	 
+		 
+		function animate() {
+			requestAnimationFrame(animate);
+			TWEEN.update();
+			for(var key in trackballs){
+				if(trackballs[key].enabled){
+					trackballs[key].update();
+				}
+			}
+		}
+		 
+		function render(event) {
+			event.target.domElement.parentNode.renderer.render(event.target.domElement.parentNode.scene, event.target.domElement.parentNode.camera);
+		}		
+		
+		var doPost = function(form){
+			if(!confirm('Are you sure you want to submit?')){ return false; }
+			var colors = document.createElement("input");
+			colors.setAttribute("name", "layout_colors");
+			colors.setAttribute("type", "hidden");
+			if(trackballs.length!=0){
+				var buf = [];
+				for(var key in trackballs){
+					var elem = document.getElementById(key);
+					buf.push(encodeColors(elem.colors));
+				}
+				colors.setAttribute("value", buf.join(":"));
+			}
+			else{
+				colors.setAttribute("value", "");
+			}
+			form.appendChild(colors);
+			form.submit();
+			return false;
+		}
+		
+		var main = function () {	
+			var divObj = document.getElementsByTagName('div');
+			var canvasObj = document.getElementsByTagName('canvas');
+			var t_matchObj= new RegExp('thumbnail_');
+			var p_matchObj= new RegExp('palette_');
+			var modeObj = document.getElementById('thumbnails');
+			var edit = false;
+			if(modeObj.getAttribute('mode') == "edit"){edit = true;}
+			var i;
+			for(i=0; i < canvasObj.length; i++){	
+				if(canvasObj[i].id.match(p_matchObj)){	
+					init_palette(canvasObj[i]);
+				}
+			}
+			for(i=0; i < divObj.length; i++){		
+				if(divObj[i].id.match(t_matchObj)){
+					createRenderer(decodeColors(divObj[i].getAttribute('param')),edit,divObj[i]);	
+				}				
+			}		
+			if(edit){
+				animate();
+			}
+		}
+		
+		window.addEventListener( 'DOMContentLoaded', main, false );
+		</script>
+		<style scoped>
+			.button-up
+			.button-top {
+				color: black;
+				text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);				
+			}			
+			.button-top {
+				background: rgb(250, 250, 250);
+			}
+			.button-up {
+				background: rgb(240, 240, 240);
+			}
+		</style>	
+		<br>
+		<a class="button-top pure-button" href="/rubik"><h1>rubik note</h1></a>
+		<br><br>
+	</div>

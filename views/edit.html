@@ -1,0 +1,73 @@
+﻿{% include "inc/header" %}
+	
+	<div id="thumbnails" mode="edit"></div>
+
+	<div class="box" align=center>
+	<form name="editform" class="pure-form" method="post" action="/rubik/done">
+		<input type="hidden" name="type" value="{{result.name}}">
+		<input type="hidden" name="id" value={{result.entity.id}}>
+		<input type="hidden" name="back" value="{{result.back}}">
+		<input type="hidden" name="page" value="edit">
+		<table class="pure-table pure-table-bordered">
+
+		    <tbody>		
+		    	<tr>
+		            <td>{{result.name}} name</td>
+		            <td><input type="text" placeholder="" size=30 name="name" value="{{result.entity.name}}"></td>
+		        </tr>
+				{% if result.steps %}
+		        <tr>
+		            <td>step number</td>
+		            <td>
+					<select name="step">
+						{% for s in result.steps %}
+						<option value="{{ s }}"{% if s == result.entity.step_number %} selected{% endif %}>{{ s + 1 }}</option>
+						{% endfor %}
+					</select>					
+					</td>	
+				</tr>
+				{% endif %}
+				
+				{% if result.layout_colors %}
+				{% for i in result.layout_colors %}
+		        <tr>	
+					{% if result.layout_colors|length == 1 %}
+					<td>cube layout</td>
+					{% elif loop.index == 1 %}
+		            <td>before<br>cube layout</td>
+					{% else %}
+		            <td>after<br>cube layout</td>
+					{% endif %}
+					<td colspan=1>
+					<div style="float:left;" id="thumbnail_{{loop.index}}" param="{{i}}"></div>
+					<canvas id="palette_{{loop.index}}" style="background-color:lightgray;" width="300" height="300" cubes="thumbnail_{{loop.index}}"></canvas>
+					</td>						
+				</tr>
+				{% endfor %}
+				{% endif %}
+				
+		        <tr>
+		            <td>&nbsp;</td>
+		            <td>
+				        <label for="cb" class="pure-checkbox">
+			                <input id="cb" type="checkbox" name="del"> Delete
+			            </label>
+		        	</td>
+		        </tr>
+		  		<tr>
+		  			<td colspan="2" align="center">
+		  				<button type="button" class="pure-button pure-button-primary" onclick="return doPost(document.editform)">edit {{result.name}}</button>
+					</td>
+		  			</td>
+		  		</tr>
+		    </tbody>
+		</table>
+	</form>
+	</div>
+
+	<div class="menu" align=center>
+		<br>
+		<a href="{{result.back}}"><button class="pure-button pure-button-small">back</button></a>
+	</div>
+
+{% include "inc/footer" %}
